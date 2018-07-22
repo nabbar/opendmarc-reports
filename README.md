@@ -12,6 +12,8 @@ It is never recommended to use directly built binary who's not included in offic
 In fact, if you find this tools in your distribution you can install it directly.
 Otherwise, it is recommend to use the source to build it your self, in your secure environment.
 
+For a best security, rebuilt this tools each week with this recommanded 3 steps process.
+
 ### 1 - Get the dependencies tools 
 the build use the golang dep tools : https://golang.github.io/dep/
 ```shell
