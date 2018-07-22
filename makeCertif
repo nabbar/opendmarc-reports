@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+#
+# Copyright 2018 Nicolas JUHEL
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+PREFIXCMD=""
+
+function print_error {
+  echo $1
+  exit $2
+}
+
+function init_go_file {
+   local destfile=${1}
+
+   if [ "${2}" = "" ] ;
+   then
+     local package=$(basename $(dirname ${destfile}))
+   else
+     local package=${2}
+   fi
+
+   echo "package ${package}" > ${destfile}
+   echo '' >> ${destfile}
+}
+
+function go_licence_file {
+   local destfile=${1}
+   cat <<EOF >> ${destfile}
+
+/*
+Copyright 2017 Nicolas JUHEL
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+EOF
+}
+
+[ -e config ] || cd ..
+[ -e config ] || print_error "Cannot find root package directory !!" 127
+
+[ "$USER" = "0" ] || PREFIXCMD="sudo "
+
+if [ -e /usr/bin/apt ];
+then
+  DEBIAN_FRONTEND=noninteractive ${PREFIXCMD}apt-get --assume-yes update
+  DEBIAN_FRONTEND=noninteractive ${PREFIXCMD}apt-get -o Dpkg::Options::="--force-confold" --no-install-recommends --assume-yes install ca-certificates
+else
+  if [ -e /usr/bin/apk ];
+  then
+    ${PREFIXCMD}apk add --no-cache  openssl ca-certificates
+  else
+     print_error "Your system is not compatible with this script !!" 2
+  fi
+fi
+
+${PREFIXCMD}update-ca-certificates --verbose --fresh
+
+destfile="config/certificates/rootCA.go"
+
+init_go_file ${destfile}
+go_licence_file ${destfile}
+echo 'const rootInjectCA = `'  >> ${destfile}
+cat /etc/ssl/certs/*.pem >> ${destfile}
+echo '`' >> ${destfile}
+echo ''  >> ${destfile}
+echo ''  >> ${destfile}
+
+exit 0
