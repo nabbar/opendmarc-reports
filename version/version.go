@@ -8,7 +8,7 @@ import (
 
 	"strings"
 
-	"github.com/hashicorp/go-version"
+	govers "github.com/hashicorp/go-version"
 	. "github.com/nabbar/opendmarc-reports/logger"
 )
 
@@ -64,12 +64,12 @@ func init() {
 
 	curVer := runtime.Version()[2:]
 
-	constraint, err := version.NewConstraint(goVersionConstraint)
+	constraint, err := govers.NewConstraint(goVersionConstraint)
 	if err != nil {
 		FatalLevel.Logf("Cannot check GoVersion contraint : %v", err)
 	}
 
-	goVersion, err := version.NewVersion(curVer)
+	goVersion, err := govers.NewVersion(curVer)
 	if err != nil {
 		FatalLevel.Logf("Cannot extract GoVersion runtime : %v", err)
 	}
