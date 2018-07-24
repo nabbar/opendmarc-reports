@@ -14,12 +14,12 @@ import (
 
 	"sync"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/nabbar/opendmarc-reports/config"
 	"github.com/nabbar/opendmarc-reports/database"
 	. "github.com/nabbar/opendmarc-reports/logger"
 	"github.com/nabbar/opendmarc-reports/tools"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 )
 

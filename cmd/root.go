@@ -5,12 +5,12 @@ import (
 	"os"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/spf13/cobra"
-	"github.com/spf13/jwalterweatherman"
-	"github.com/spf13/viper"
 	"github.com/nabbar/opendmarc-reports/config"
 	. "github.com/nabbar/opendmarc-reports/logger"
 	"github.com/nabbar/opendmarc-reports/version"
+	"github.com/spf13/cobra"
+	"github.com/spf13/jwalterweatherman"
+	"github.com/spf13/viper"
 )
 
 /*

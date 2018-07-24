@@ -14,10 +14,10 @@ import (
 	"net/http"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/pelletier/go-toml"
-	"github.com/spf13/viper"
 	. "github.com/nabbar/opendmarc-reports/logger"
 	"github.com/nabbar/opendmarc-reports/tools"
+	"github.com/pelletier/go-toml"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 )
 
