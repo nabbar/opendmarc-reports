@@ -107,35 +107,35 @@ func GetDbCli() *sql.DB {
 
 func Close() {
 	if dbcli != nil {
-		dbcli.Close()
-		InfoLevel.Logf("Database connection is closed")
+		err := dbcli.Close()
+		FatalLevel.LogErrorCtx(InfoLevel, "closing mysql database connection", err)
 		dbcli = nil
 	}
 }
 
 func CheckTables() {
 	if err := NewDomain("").CheckTable(); err != nil {
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("checking table '%s' exists", table_domains), err)
+		FatalLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("checking table '%s' exists", table_domains), err)
 	}
 
 	if err := NewIpAddr("").CheckTable(); err != nil {
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("checking table '%s' exists", table_ipaddr), err)
+		FatalLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("checking table '%s' exists", table_ipaddr), err)
 	}
 
 	if err := NewReporters("").CheckTable(); err != nil {
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("checking table '%s' exists", table_reporters), err)
+		FatalLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("checking table '%s' exists", table_reporters), err)
 	}
 
 	if err := NewMessages("").CheckTable(); err != nil {
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("checking table '%s' exists", table_messages), err)
+		FatalLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("checking table '%s' exists", table_messages), err)
 	}
 
 	if err := NewSignatures(nil).CheckTable(); err != nil {
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("checking table '%s' exists", table_signatures), err)
+		FatalLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("checking table '%s' exists", table_signatures), err)
 	}
 
 	if err := NewRequests(nil).CheckTable(); err != nil {
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("checking table '%s' exists", table_requests), err)
+		FatalLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("checking table '%s' exists", table_requests), err)
 	}
 }
 

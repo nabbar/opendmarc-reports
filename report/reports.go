@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"strconv"
 	"strings"
 
@@ -14,8 +15,10 @@ import (
 
 	"net/url"
 
+	"sync"
+
 	"github.com/kennygrant/sanitize"
-	"github.com/nabbar/opendmarc-reports/logger"
+	. "github.com/nabbar/opendmarc-reports/logger"
 	"github.com/nabbar/opendmarc-reports/tools"
 )
 
@@ -46,6 +49,7 @@ type reportFile struct {
 	xmlFile feedback
 	xmlName string
 	zipName string
+	zipFile *bytes.Buffer
 }
 
 type Report interface {
@@ -53,6 +57,7 @@ type Report interface {
 	String(headerXml bool) (string, error)
 	Byte(headerXml bool) ([]byte, error)
 	Zip() (*bytes.Buffer, error)
+	SendReport()
 
 	GetFileName() string
 	GetZipName() string
@@ -150,38 +155,42 @@ func (rep reportFile) Byte(headerXml bool) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (rep reportFile) Zip() (*bytes.Buffer, error) {
-	var (
-		buf = bytes.NewBuffer(make([]byte, 0))
-		wrt = zip.NewWriter(buf)
-	)
+func (rep *reportFile) Zip() (*bytes.Buffer, error) {
+	if rep.zipFile == nil || rep.zipFile.Len() < 1 {
+		var (
+			buf = bytes.NewBuffer(make([]byte, 0))
+			wrt = zip.NewWriter(buf)
+		)
 
-	// Register a custom Deflate compressor.
-	wrt.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
-		return flate.NewWriter(out, flate.BestCompression)
-	})
+		// Register a custom Deflate compressor.
+		wrt.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
+			return flate.NewWriter(out, flate.BestCompression)
+		})
 
-	wrt.SetComment(
-		fmt.Sprintf("From: %s | Org: %s | Domain : %s | Date From : %s | Date To : %s",
-			rep.xmlFile.MetaData.Email,
-			rep.xmlFile.MetaData.OrgName,
-			rep.xmlFile.Policy.Domain,
-			time.Unix(int64(rep.xmlFile.MetaData.DateRange.Begin), 0).String(),
-			time.Unix(int64(rep.xmlFile.MetaData.DateRange.End), 0).String(),
-		),
-	)
+		wrt.SetComment(
+			fmt.Sprintf("From: %s | Org: %s | Domain : %s | Date From : %s | Date To : %s",
+				rep.xmlFile.MetaData.Email,
+				rep.xmlFile.MetaData.OrgName,
+				rep.xmlFile.Policy.Domain,
+				time.Unix(int64(rep.xmlFile.MetaData.DateRange.Begin), 0).String(),
+				time.Unix(int64(rep.xmlFile.MetaData.DateRange.End), 0).String(),
+			),
+		)
 
-	if src, err := rep.Buffer(true); err != nil {
-		return nil, err
-	} else if f, err := wrt.Create(rep.xmlName); err != nil {
-		return nil, err
-	} else if _, err := f.Write(src.Bytes()); err != nil {
-		return nil, err
-	} else if err := wrt.Close(); err != nil {
-		return nil, err
+		if src, err := rep.Buffer(true); err != nil {
+			return nil, err
+		} else if f, err := wrt.Create(rep.xmlName); err != nil {
+			return nil, err
+		} else if _, err := f.Write(src.Bytes()); err != nil {
+			return nil, err
+		} else if err := wrt.Close(); err != nil {
+			return nil, err
+		}
+
+		rep.zipFile = buf
 	}
 
-	return buf, nil
+	return rep.zipFile, nil
 }
 
 func (rep reportFile) GetFileName() string {
@@ -201,7 +210,7 @@ func (rep reportFile) parseUri(filter string) []string {
 		}
 
 		if u, e := url.Parse(s); e != nil {
-			logger.WarnLevel.LogErrorCtx(false, fmt.Sprintf("parsing rua list with value '%s'", s), e)
+			WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("parsing rua list with value '%s'", s), e)
 			continue
 		} else if strings.HasPrefix(u.Scheme, filter) {
 			res = append(res, strings.TrimSpace(s))
@@ -209,6 +218,16 @@ func (rep reportFile) parseUri(filter string) []string {
 	}
 
 	return res
+}
+
+func (rep reportFile) isUriEmpty() bool {
+	for _, s := range rep.repuri {
+		if s != "-" {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (rep reportFile) GetUriEmail() tools.ListMailAddress {
@@ -259,4 +278,44 @@ func (rep reportFile) GetUriUnknown() []string {
 	}
 
 	return res
+}
+
+func (rep *reportFile) SendReport() {
+	if rep == nil || rep.isUriEmpty() {
+		PanicLevel.LogErrorCtx(DebugLevel, "checking report", errors.New("empty or nil report"))
+		return
+	}
+
+	_, err := rep.Zip()
+
+	if err != nil || rep.zipFile.Len() < 1 {
+		ErrorLevel.LogErrorCtx(NilLevel, "creating Zip file", err)
+		return
+	}
+
+	var wg sync.WaitGroup
+
+	for _, h := range rep.GetUriHttp() {
+		wg.Add(1)
+		go func() {
+			rep.SendHttp(h)
+			wg.Done()
+		}()
+	}
+
+	for _, f := range rep.GetUriFtp() {
+		wg.Add(1)
+		go func() {
+			rep.SendFtp(f)
+			wg.Done()
+		}()
+	}
+
+	for _, u := range rep.GetUriUnknown() {
+		ErrorLevel.LogErrorCtx(NilLevel, fmt.Sprintf("parsing rua field with item '%s'", u), errors.New("unknown send method"))
+	}
+
+	rep.SendMail()
+	InfoLevel.Logf("Waiting sending reports threads has finished...")
+	wg.Wait()
 }

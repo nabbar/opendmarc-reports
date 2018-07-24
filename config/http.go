@@ -42,7 +42,7 @@ type HTTP interface {
 
 func newHTTPClient(Url string) HTTP {
 	pUrl, err := url.Parse(Url)
-	FatalLevel.LogErrorCtx(true, fmt.Sprintf("parsing url '%s'", Url), err)
+	PanicLevel.LogErrorCtx(NilLevel, fmt.Sprintf("parsing url '%s'", Url), err)
 
 	return &httpClient{
 		url: pUrl,
@@ -96,14 +96,14 @@ func (obj *httpClient) newRequest(method string, body *bytes.Buffer) *http.Reque
 	}
 
 	req, err := http.NewRequest(method, obj.url.String(), reader)
-	FatalLevel.LogErrorCtx(true, fmt.Sprintf("creating '%s' request to '%s'", method, obj.url.Host), err)
+	PanicLevel.LogErrorCtx(NilLevel, fmt.Sprintf("creating '%s' request to '%s'", method, obj.url.Host), err)
 
 	return req
 }
 
 func (obj *httpClient) doRequest(req *http.Request) *http.Response {
 	res, err := obj.cli.Do(req)
-	FatalLevel.LogErrorCtx(true, fmt.Sprintf("running request '%s:%s'", req.Method, req.URL.Host), err)
+	PanicLevel.LogErrorCtx(NilLevel, fmt.Sprintf("running request '%s:%s'", req.Method, req.URL.Host), err)
 
 	return res
 }

@@ -84,6 +84,7 @@ const (
 	WarnLevel
 	InfoLevel
 	DebugLevel
+	NilLevel
 )
 
 func GetLevelListString() []string {
@@ -184,19 +185,19 @@ func (level Level) LogError(err error) bool {
 	return false
 }
 
-func (level Level) LogErrorCtx(logElse bool, context string, err error) bool {
+func (level Level) LogErrorCtx(levelElse Level, context string, err error) bool {
 	if err != nil {
 		level.logDetails(fmt.Sprintf("%s while %s : %v", level.String(), context, err), nil)
 		return true
-	} else {
-		DebugLevel.logDetails(fmt.Sprintf("No %s while %s", level.String(), context), nil)
+	} else if levelElse != NilLevel {
+		levelElse.logDetails(fmt.Sprintf("OK : %s", context), nil)
 	}
 
 	return false
 }
 
-func (level Level) LogErrorCtxf(logElse bool, contextPattern string, err error, args ...interface{}) bool {
-	return level.LogErrorCtx(logElse, fmt.Sprintf(contextPattern, args...), err)
+func (level Level) LogErrorCtxf(levelElse Level, contextPattern string, err error, args ...interface{}) bool {
+	return level.LogErrorCtx(levelElse, fmt.Sprintf(contextPattern, args...), err)
 }
 
 func cleanTraceFile(file string) string {

@@ -145,9 +145,9 @@ func newSMTPConfig(dsn string) *smtpConfig {
 						// dsn[i-1] must be == ')' if an address is specified
 						if dsn[i-1] != ')' {
 							if strings.ContainsRune(dsn[k+1:i], ')') {
-								FatalLevel.LogErrorCtx(true, "parsing SMTP connection string", errors.New("invalid DSN: did you forget to escape a param value?"))
+								FatalLevel.LogErrorCtx(NilLevel, "parsing SMTP connection string", errors.New("invalid DSN: did you forget to escape a param value?"))
 							}
-							FatalLevel.LogErrorCtx(true, "parsing SMTP connection string", errors.New("invalid DSN: network address not terminated (missing closing brace)"))
+							FatalLevel.LogErrorCtx(NilLevel, "parsing SMTP connection string", errors.New("invalid DSN: network address not terminated (missing closing brace)"))
 						}
 
 						if strings.ContainsRune(dsn[k+1:i-1], ':') {
@@ -176,7 +176,7 @@ func newSMTPConfig(dsn string) *smtpConfig {
 			for j = i + 1; j < len(dsn); j++ {
 				if dsn[j] == '?' {
 					if val, err := url.ParseQuery(dsn[j+1:]); err != nil {
-						FatalLevel.LogErrorCtx(true, "checking params", err)
+						FatalLevel.LogErrorCtx(NilLevel, "checking params", err)
 					} else {
 						if val.Get("ServerName") != "" {
 							smtpcnf.ServerName = val.Get("ServerName")
@@ -198,7 +198,7 @@ func newSMTPConfig(dsn string) *smtpConfig {
 	}
 
 	if !foundSlash && len(dsn) > 0 {
-		FatalLevel.LogErrorCtx(true, "checking SMTP connection url", errors.New("invalid DSN: missing the slash separating the database name"))
+		FatalLevel.LogErrorCtx(NilLevel, "checking SMTP connection url", errors.New("invalid DSN: missing the slash separating the database name"))
 	}
 
 	return smtpcnf
@@ -235,7 +235,7 @@ func (cnf *smtpClient) Client() *smtp.Client {
 		if cnf.cfg.ServerName == "" && !strings.HasPrefix(strings.ToLower(cnf.cfg.Net), "unix") {
 			cnf.cfg.ServerName = cnf.cfg.Host
 		} else if strings.HasPrefix(strings.ToLower(cnf.cfg.Net), "unix") && cnf.cfg.TLS != TLSNONE {
-			FatalLevel.LogErrorCtx(true, "checking smtp config", errors.New("cannot use tls or starttls connection with unix socket connection"))
+			FatalLevel.LogErrorCtx(NilLevel, "checking smtp config", errors.New("cannot use tls or starttls connection with unix socket connection"))
 		}
 
 		if cnf.cfg.Port > 0 {
@@ -244,7 +244,7 @@ func (cnf *smtpClient) Client() *smtp.Client {
 
 		if cnf.cfg.TLS == TLS {
 			cnf.con, err = tls.Dial(cnf.cfg.Net, addr, certificates.GetTLSConfig(cnf.cfg.ServerName, cnf.cfg.SkipVerify))
-			if ErrorLevel.LogErrorCtx(true, fmt.Sprintf("trying to intialize SMTP '%s' over tls connection to '%s'", cnf.cfg.Net, addr), err) {
+			if ErrorLevel.LogErrorCtx(NilLevel, fmt.Sprintf("trying to intialize SMTP '%s' over tls connection to '%s'", cnf.cfg.Net, addr), err) {
 				cnf.cfg.TLS = STARTTLS
 				err = nil
 			}
@@ -252,20 +252,20 @@ func (cnf *smtpClient) Client() *smtp.Client {
 
 		if cnf.cfg.TLS != TLS {
 			cnf.con, err = net.Dial(cnf.cfg.Net, addr)
-			FatalLevel.LogErrorCtx(true, fmt.Sprintf("trying to intialize SMTP '%s' connection to '%s'", cnf.cfg.Net, addr), err)
+			PanicLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("trying to intialize SMTP '%s' connection to '%s'", cnf.cfg.Net, addr), err)
 		}
 
 		cnf.cli, err = smtp.NewClient(cnf.con, addr)
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("trying to start SMTP client to host '%s'", addr), err)
+		PanicLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("trying to start SMTP client to host '%s'", addr), err)
 
 		if cnf.cfg.TLS == STARTTLS {
 			err = cnf.cli.StartTLS(certificates.GetTLSConfig(cnf.cfg.ServerName, cnf.cfg.SkipVerify))
-			FatalLevel.LogErrorCtx(true, fmt.Sprintf("trying to STARTTLS with SMTP server '%s'", addr), err)
+			PanicLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("trying to STARTTLS with SMTP server '%s'", addr), err)
 		}
 
 		if cnf.cfg.User != "" || cnf.cfg.Pass != "" {
 			err = cnf.cli.Auth(smtp.PlainAuth("", cnf.cfg.User, cnf.cfg.Pass, addr))
-			FatalLevel.LogErrorCtx(true, fmt.Sprintf("trying to authentificate with user '%s' to SMTP server '%s'", cnf.cfg.User, addr), err)
+			PanicLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("trying to authentificate with user '%s' to SMTP server '%s'", cnf.cfg.User, addr), err)
 		}
 
 		cnf.cli.Extension("8BITMIME")

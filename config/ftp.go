@@ -10,9 +10,9 @@ import (
 	"path"
 	"strings"
 
+	"github.com/secsy/goftp"
 	"github.com/nabbar/opendmarc-reports/config/certificates"
 	. "github.com/nabbar/opendmarc-reports/logger"
-	"github.com/secsy/goftp"
 )
 
 /*
@@ -45,7 +45,7 @@ type FTP interface {
 
 func newFTPClient(uri string) FTP {
 	pUrl, err := url.Parse(uri)
-	FatalLevel.LogErrorCtx(true, fmt.Sprintf("parsing url '%s'", uri), err)
+	PanicLevel.LogErrorCtx(NilLevel, fmt.Sprintf("parsing url '%s'", uri), err)
 
 	return &ftpClient{
 		url: pUrl,
@@ -75,7 +75,7 @@ func getFtpConfig(uri *url.URL) goftp.Config {
 func (obj *ftpClient) Connect() {
 	var err error
 	obj.cli, err = goftp.DialConfig(obj.cfg, obj.url.Host)
-	FatalLevel.LogErrorCtxf(true, "connecting to FTP Host '%s'", err, obj.url.Host)
+	PanicLevel.LogErrorCtxf(InfoLevel, "connecting to FTP Host '%s'", err, obj.url.Host)
 }
 
 func (obj *ftpClient) Close() {
@@ -93,7 +93,7 @@ func (obj *ftpClient) Store(zipName string, zipFile *bytes.Buffer) {
 	if obj.url.Path != "/" {
 		if _, err := obj.cli.Stat(obj.url.Path); err != nil {
 			_, err := obj.cli.Mkdir(obj.url.Path)
-			FatalLevel.LogErrorCtxf(true, "creating FTP path '%s' to Host '%s'", err, obj.url.Path, obj.url.Host)
+			PanicLevel.LogErrorCtxf(InfoLevel, "creating FTP path '%s' to Host '%s'", err, obj.url.Path, obj.url.Host)
 		}
 	}
 
@@ -101,5 +101,5 @@ func (obj *ftpClient) Store(zipName string, zipFile *bytes.Buffer) {
 	ful := strings.Replace(path.Join(dir, zipName), string(os.PathSeparator), "/", -1)
 	err := obj.cli.Store(ful, bytes.NewReader(zipFile.Bytes()))
 
-	FatalLevel.LogErrorCtxf(true, "storing FTP Zip File '%s' to Host '%s'", err, ful, obj.url.Host)
+	PanicLevel.LogErrorCtxf(InfoLevel, "storing FTP Zip File '%s' to Host '%s'", err, ful, obj.url.Host)
 }

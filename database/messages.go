@@ -401,6 +401,41 @@ func (obj *Messages) Load() error {
 	return nil
 }
 
+func (obj *Messages) SetSent(Sent bool) error {
+	var (
+		res sql.Result
+		row int64
+		err error
+	)
+
+	if obj.JobId == "" {
+		return fmt.Errorf("cannot update an empty row into table %s", obj.table)
+	}
+
+	if obj.Date.IsZero() {
+		obj.Date = time.Now()
+	}
+
+	obj.Sent = Sent
+	res, err = GetDbCli().Exec(fmt.Sprintf("UPDATE `%s` SET `sent` = ?", obj.table)+" WHERE `id`=? LIMIT 1", obj.Sent, obj.Id)
+
+	if err != nil {
+		return err
+	}
+
+	row, err = res.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+
+	if row != 0 {
+		DebugLevel.Logf("Updated %d row into table %s : %s (id: %d)", row, obj.table, obj.JobId, obj.Id)
+	}
+
+	return nil
+}
+
 func (obj *Messages) Save() error {
 	var (
 		res sql.Result
@@ -411,35 +446,35 @@ func (obj *Messages) Save() error {
 
 	if obj.Reporter != nil {
 		err = obj.Reporter.Save()
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("while saving Reporter for job '%s'", obj.JobId), err)
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Reporter for job '%s'", obj.JobId), err)
 	} else {
 		obj.Reporter = NewReporters("")
 	}
 
 	if obj.Ip != nil {
 		err = obj.Ip.Save()
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("while saving Ip for job '%s'", obj.JobId), err)
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Ip for job '%s'", obj.JobId), err)
 	} else {
 		obj.Ip = NewIpAddr("")
 	}
 
 	if obj.FromDomain != nil {
 		err = obj.FromDomain.Save()
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("while saving From Domain for job '%s'", obj.JobId), err)
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving From Domain for job '%s'", obj.JobId), err)
 	} else {
 		obj.FromDomain = NewDomain("")
 	}
 
 	if obj.EnvDomain != nil {
 		err = obj.EnvDomain.Save()
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("while saving Env Domain for job '%s'", obj.JobId), err)
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Env Domain for job '%s'", obj.JobId), err)
 	} else {
 		obj.EnvDomain = NewDomain("")
 	}
 
 	if obj.PolicyDomain != nil {
 		err = obj.PolicyDomain.Save()
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("while saving Policy Domain for job '%s'", obj.JobId), err)
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Policy Domain for job '%s'", obj.JobId), err)
 	} else {
 		obj.PolicyDomain = NewDomain("")
 	}
@@ -447,7 +482,7 @@ func (obj *Messages) Save() error {
 	if obj.Request != nil {
 		req := NewRequests(obj.FromDomain)
 		err = req.Load()
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("while saving request for job '%s'", obj.JobId), err)
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving request for job '%s'", obj.JobId), err)
 
 		if req.IsLocked() {
 			return fmt.Errorf("request id '%d' for domain '%s' (id: %d) is locked", req.Id, req.Domain.Name, req.Domain.Id)
@@ -480,7 +515,7 @@ func (obj *Messages) Save() error {
 
 		obj.Request = req
 		err = obj.Request.Save()
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("while saving Request for job '%s'", obj.JobId), err)
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Request for job '%s'", obj.JobId), err)
 	} else {
 		obj.Request = NewRequests(obj.FromDomain)
 		obj.Load()
@@ -564,6 +599,83 @@ func (obj *Messages) Update() error {
 		obj.Date = time.Now()
 	}
 
+	if obj.Reporter != nil && obj.Reporter.Id == 0 {
+		err = obj.Reporter.Save()
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Reporter for job '%s'", obj.JobId), err)
+	} else if obj.Reporter == nil {
+		obj.Reporter = NewReporters("")
+	}
+
+	if obj.Ip != nil && obj.Ip.Id == 0 {
+		err = obj.Ip.Save()
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Ip for job '%s'", obj.JobId), err)
+	} else if obj.Ip == nil {
+		obj.Ip = NewIpAddr("")
+	}
+
+	if obj.FromDomain != nil && obj.FromDomain.Id == 0 {
+		err = obj.FromDomain.Save()
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving From Domain for job '%s'", obj.JobId), err)
+	} else if obj.FromDomain == nil {
+		obj.FromDomain = NewDomain("")
+	}
+
+	if obj.EnvDomain != nil && obj.EnvDomain.Id == 0 {
+		err = obj.EnvDomain.Save()
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Env Domain for job '%s'", obj.JobId), err)
+	} else if obj.EnvDomain == nil {
+		obj.EnvDomain = NewDomain("")
+	}
+
+	if obj.PolicyDomain != nil && obj.PolicyDomain.Id == 0 {
+		err = obj.PolicyDomain.Save()
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Policy Domain for job '%s'", obj.JobId), err)
+	} else if obj.PolicyDomain == nil {
+		obj.PolicyDomain = NewDomain("")
+	}
+
+	if obj.Request != nil && obj.Request.Id == 0 {
+		req := NewRequests(obj.FromDomain)
+		err = req.Load()
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving request for job '%s'", obj.JobId), err)
+
+		if req.IsLocked() {
+			return fmt.Errorf("request id '%d' for domain '%s' (id: %d) is locked", req.Id, req.Domain.Name, req.Domain.Id)
+		}
+
+		req.Repuri = tools.CleanJoin(tools.UnicSliceString(tools.CleanMergeSlice(strings.Split(req.Repuri, ","), strings.Split(obj.Request.Repuri, ",")...)), ",")
+		if !obj.Request.Date.IsZero() {
+			req.SetDateTime(obj.Request.Date)
+		}
+
+		if obj.Request.Pct != 0 {
+			req.Pct = obj.Request.Pct
+		}
+
+		if obj.Request.Policy != 0 {
+			req.Policy = obj.Request.Policy
+		}
+
+		if obj.Request.Spolicy != 0 {
+			req.Spolicy = obj.Request.Spolicy
+		}
+
+		if obj.Request.ADKIM != 0 {
+			req.ADKIM = obj.Request.ADKIM
+		}
+
+		if obj.Request.ASPF != 0 {
+			req.ASPF = obj.Request.ASPF
+		}
+
+		obj.Request = req
+		err = obj.Request.Save()
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("while saving Request for job '%s'", obj.JobId), err)
+	} else if obj.Request == nil {
+		obj.Request = NewRequests(obj.FromDomain)
+		obj.Load()
+	}
+
 	sql := fmt.Sprintf("UPDATE `%s` SET `date` = ?, `jobid` = ?", obj.table)
 	arg := []interface{}{obj.Date, obj.JobId}
 
@@ -645,36 +757,6 @@ func (obj *Messages) Update() error {
 
 	if row != 0 {
 		DebugLevel.Logf("Updated %d row into table %s : %s (id: %d)", row, obj.table, obj.JobId, obj.Id)
-	}
-
-	return nil
-}
-
-func (obj *Messages) Delete() error {
-	var (
-		res sql.Result
-		row int64
-		err error
-	)
-
-	if obj.Id == 0 {
-		return fmt.Errorf("cannot delete an empty or not saved row into table %s", obj.table)
-	}
-
-	res, err = GetDbCli().Exec(fmt.Sprintf("DELETE FROM `%s` WHERE `id`=? LIMIT 1", obj.table), obj.Id)
-
-	if err != nil {
-		return err
-	}
-
-	row, err = res.RowsAffected()
-
-	if err != nil {
-		return err
-	}
-
-	if row != 0 {
-		DebugLevel.Logf("Deleted %d row into table %s : %s (id: %d)", row, obj.table, obj.JobId, obj.Id)
 	}
 
 	return nil

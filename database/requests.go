@@ -140,7 +140,7 @@ func MakeDate(dateDay bool, dateInterval time.Duration) (dateFrom, dateTo int, e
 }
 
 func (obj *Requests) SetLocked() error {
-	res, err := GetDbCli().Exec(fmt.Sprintf("UPDATE `%s`", obj.table)+" SET `locked` = ? WHERE `id`=? LIMIT 1", true, obj.Id)
+	res, err := GetDbCli().Exec(fmt.Sprintf("UPDATE `%s`", obj.table)+" SET `locked` = ? WHERE `id`=? LIMIT 1", 1, obj.Id)
 
 	if err != nil {
 		return err
@@ -149,7 +149,7 @@ func (obj *Requests) SetLocked() error {
 	if row, err := res.RowsAffected(); err != nil {
 		return err
 	} else if row != 0 {
-		DebugLevel.Logf("Updated %d row into table %s : %s (id: %d)", row, obj.table, obj.Repuri, obj.Id)
+		DebugLevel.Logf("Locked %d row into table %s : %s (id: %d)", row, obj.table, obj.Repuri, obj.Id)
 	}
 
 	obj.Locked = true
@@ -157,7 +157,7 @@ func (obj *Requests) SetLocked() error {
 }
 
 func (obj *Requests) SetUnLocked() error {
-	res, err := GetDbCli().Exec(fmt.Sprintf("UPDATE `%s`", obj.table)+" SET `locked` = ? WHERE `id`=? LIMIT 1", false, obj.Id)
+	res, err := GetDbCli().Exec(fmt.Sprintf("UPDATE `%s`", obj.table)+" SET `locked` = ? WHERE `id`=? LIMIT 1", 0, obj.Id)
 
 	if err != nil {
 		return err
@@ -166,7 +166,7 @@ func (obj *Requests) SetUnLocked() error {
 	if row, err := res.RowsAffected(); err != nil {
 		return err
 	} else if row != 0 {
-		DebugLevel.Logf("Updated %d row into table %s : %s (id: %d)", row, obj.table, obj.Repuri, obj.Id)
+		DebugLevel.Logf("Unlocked %d row into table %s : %s (id: %d)", row, obj.table, obj.Repuri, obj.Id)
 	}
 
 	obj.Locked = false
@@ -377,36 +377,6 @@ func (obj *Requests) Update() error {
 	return nil
 }
 
-func (obj *Requests) Delete() error {
-	var (
-		res sql.Result
-		row int64
-		err error
-	)
-
-	if obj.Id == 0 {
-		return fmt.Errorf("cannot delete an empty or not saved row into table %s", obj.table)
-	}
-
-	res, err = GetDbCli().Exec(fmt.Sprintf("DELETE FROM `%s` WHERE `id`=? LIMIT 1", obj.table), obj.Id)
-
-	if err != nil {
-		return err
-	}
-
-	row, err = res.RowsAffected()
-
-	if err != nil {
-		return err
-	}
-
-	if row != 0 {
-		DebugLevel.Logf("Deleted %d row into table %s : %s (id: %d)", row, obj.table, obj.Repuri, obj.Id)
-	}
-
-	return nil
-}
-
 func (obj *Requests) SetDate(received string) error {
 	var (
 		val time.Time
@@ -433,28 +403,63 @@ func (obj *Requests) SetDateTime(received time.Time) error {
 	return nil
 }
 
-func (obj *Requests) GetReport(org, email string, upd, sent bool, dateMode bool, dateInterval time.Duration) (report.Report, error) {
+func (obj *Requests) setSentMessages(sent bool, dateMode bool, dateInterval time.Duration) error {
+	lst, err := GetAllMessages(obj, sent, dateMode, dateInterval)
+	if err != nil {
+		return err
+	}
+
+	for _, m := range lst {
+		err = m.SetSent(true)
+		ErrorLevel.LogErrorCtx(NilLevel, fmt.Sprintf("saving sent messages '%s' (ID: %d)", m.JobId, m.Id), err)
+	}
+
+	return nil
+}
+
+func (obj *Requests) SendReport(org, email string, upd, sent bool, dateMode bool, dateInterval time.Duration) error {
 	if obj.IsLocked() {
-		return nil, errors.New("cannot generate report for a locked request")
+		return errors.New("cannot generate report for a locked request")
 	} else if err := obj.SetLocked(); err != nil {
-		return nil, err
+		return err
+	}
+
+	defer func() {
+		if obj.Locked {
+			err := obj.SetUnLocked()
+			ErrorLevel.LogErrorCtxf(NilLevel, "unlocking request '%s' (ID: %d)", err, obj.Repuri, obj.Id)
+		}
+		if obj.Locked {
+			ErrorLevel.LogErrorCtxf(NilLevel, "checking that current request '%s' (ID: %d) is unlocked: ", errors.New("cannot unlocked current request"), obj.Repuri, obj.Id)
+		}
+	}()
+
+	if obj.Repuri == "-" {
+		InfoLevel.Logf("Skip Report => empty RUA : '%s' (id : %d)", obj.Repuri, obj.Id)
+
+		if !upd {
+			InfoLevel.Logf("Not updated sent messages for request '%s' (id : %d)", obj.Repuri, obj.Id)
+			return nil
+		}
+
+		return obj.setSentMessages(sent, dateMode, dateInterval)
 	}
 
 	df, de, err := GetRangeDate(obj, sent, dateMode, dateInterval)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	lst, err := GetAllMessages(obj, sent, dateMode, dateInterval)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var msg = make([]report.ReportRecord, 0)
 
 	for _, m := range lst {
 		if r, e := m.GetReport(); e != nil {
-			return nil, err
+			return err
 		} else {
 			msg = append(msg, r)
 		}
@@ -467,15 +472,19 @@ func (obj *Requests) GetReport(org, email string, upd, sent bool, dateMode bool,
 		msg,
 	)
 
-	if upd {
-		for _, m := range lst {
-			m.Sent = true
-			err = m.Save()
-			ErrorLevel.LogErrorCtx(true, fmt.Sprintf("saving sent messages '%s' (ID: %d)", m.JobId, m.Id), err)
-		}
+	rep.SendReport()
+
+	if !upd {
+		InfoLevel.Logf("Not updated sent messages for request '%s' (id : %d)", obj.Repuri, obj.Id)
+		return nil
 	}
 
-	return rep, obj.SetUnLocked()
+	for _, m := range lst {
+		err = m.SetSent(true)
+		ErrorLevel.LogErrorCtx(NilLevel, fmt.Sprintf("saving sent messages '%s' (ID: %d)", m.JobId, m.Id), err)
+	}
+
+	return obj.SetUnLocked()
 }
 
 func (obj Requests) GetADKIM() string {

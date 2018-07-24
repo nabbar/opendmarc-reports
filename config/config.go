@@ -14,10 +14,10 @@ import (
 	"net/http"
 
 	_ "github.com/go-sql-driver/mysql"
-	. "github.com/nabbar/opendmarc-reports/logger"
-	"github.com/nabbar/opendmarc-reports/tools"
 	"github.com/pelletier/go-toml"
 	"github.com/spf13/viper"
+	. "github.com/nabbar/opendmarc-reports/logger"
+	"github.com/nabbar/opendmarc-reports/tools"
 	"gopkg.in/yaml.v2"
 )
 
@@ -158,45 +158,48 @@ func loadConfig() {
 
 func formatInterval(str string) string {
 	interval, err := time.ParseDuration(str)
-	FatalLevel.LogErrorCtx(true, fmt.Sprintf("parsing duration format for '%s'", str), err)
+	FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("parsing duration format for '%s'", str), err)
 
 	return fmt.Sprintf("%s", interval.Truncate(time.Second).String())
 }
 
 func (cnf *configModel) Connect() {
 	db := cnf.GetDatabase()
-	defer db.Close()
+	defer func() {
+		err := db.Close()
+		FatalLevel.LogErrorCtx(InfoLevel, "closing mysql database connection", err)
+	}()
 
 	err := db.Ping()
-	FatalLevel.LogErrorCtx(true, "Ping to mysql database", err)
+	FatalLevel.LogErrorCtx(DebugLevel, "Ping to mysql database", err)
 
 	cnf.GetSMTP().Check()
 }
 
 func (cnf configModel) JSON() []byte {
 	str, err := json.Marshal(cnf)
-	FatalLevel.LogErrorCtx(true, "json encoding config", err)
+	FatalLevel.LogErrorCtx(DebugLevel, "json encoding config", err)
 
 	return []byte(fmt.Sprintf("%s\n", string(str)))
 }
 
 func (cnf configModel) YAML() []byte {
 	str, err := yaml.Marshal(cnf)
-	FatalLevel.LogErrorCtx(true, "yaml encoding config", err)
+	FatalLevel.LogErrorCtx(DebugLevel, "yaml encoding config", err)
 
 	return []byte(fmt.Sprintf("---\n%s\n", string(str)))
 }
 
 func (cnf configModel) TOML() []byte {
 	str, err := toml.Marshal(cnf)
-	FatalLevel.LogErrorCtx(true, "toml encoding config", err)
+	FatalLevel.LogErrorCtx(DebugLevel, "toml encoding config", err)
 
 	return []byte(fmt.Sprintf("%s\n", string(str)))
 }
 
 func (cnf configModel) GetInterval() time.Duration {
 	interval, err := time.ParseDuration(cnf.Interval)
-	FatalLevel.LogErrorCtx(true, "parsing duration format for interval", err)
+	FatalLevel.LogErrorCtx(NilLevel, "parsing duration format for interval", err)
 
 	return interval
 }
@@ -242,7 +245,7 @@ func (cnf configModel) GetDatabase() *sql.DB {
 	}
 
 	db, err := sql.Open("mysql", cnf.MysqlDSN)
-	FatalLevel.LogErrorCtx(true, "Connect to mysql database", err)
+	FatalLevel.LogErrorCtx(InfoLevel, "Connect to mysql database", err)
 
 	if cnf.Utc {
 		var (
@@ -250,7 +253,7 @@ func (cnf configModel) GetDatabase() *sql.DB {
 		)
 
 		_, err = db.Exec("SET TIME_ZONE='+00:00'")
-		ErrorLevel.LogErrorCtx(true, "setting UTC DB connection mode", err)
+		ErrorLevel.LogErrorCtx(InfoLevel, "setting UTC DB connection mode", err)
 	}
 
 	return db

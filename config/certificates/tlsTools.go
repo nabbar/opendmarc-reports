@@ -43,7 +43,7 @@ func AddCertPair(cert []tls.Certificate, CertKey, CertCrt string) []tls.Certific
 
 	crt, err := tls.LoadX509KeyPair(CertCrt, CertKey)
 
-	if ErrorLevel.LogErrorCtx(false, "loading pair config certificate", err) {
+	if ErrorLevel.LogErrorCtx(NilLevel, "loading pair config certificate", err) {
 		return cert
 	}
 
@@ -62,7 +62,7 @@ func AppendCertificates(cert []tls.Certificate) []tls.Certificate {
 
 	crt, err = tls.X509KeyPair([]byte(certificateCrt), []byte(certificateKey))
 
-	if ErrorLevel.LogErrorCtx(false, "loading pair included certificate", err) {
+	if ErrorLevel.LogErrorCtx(NilLevel, "loading pair included certificate", err) {
 		return cert
 	}
 

@@ -14,12 +14,12 @@ import (
 
 	"sync"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/nabbar/opendmarc-reports/config"
 	"github.com/nabbar/opendmarc-reports/database"
 	. "github.com/nabbar/opendmarc-reports/logger"
 	"github.com/nabbar/opendmarc-reports/tools"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 )
 
@@ -135,19 +135,19 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 	InfoLevel.Logf("Parsing file: %s ...", filepath)
 
 	_, e := os.Stat(filepath)
-	if ErrorLevel.LogErrorCtx(true, fmt.Sprintf("checking file '%s'", filepath), e) {
+	if ErrorLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("checking file '%s'", filepath), e) {
 		return
 	}
 
 	f, e := os.Open(filepath)
-	if ErrorLevel.LogErrorCtx(true, fmt.Sprintf("opening file '%s'", filepath), e) {
+	if ErrorLevel.LogErrorCtx(InfoLevel, fmt.Sprintf("opening file '%s'", filepath), e) {
 		return
 	}
 
 	defer f.Close()
 
 	s := bufio.NewScanner(f)
-	if ErrorLevel.LogErrorCtx(true, fmt.Sprintf("reading file '%s'", filepath), s.Err()) {
+	if ErrorLevel.LogErrorCtx(NilLevel, fmt.Sprintf("reading file '%s'", filepath), s.Err()) {
 		return
 	}
 
@@ -155,14 +155,14 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 	InfoLevel.Logf("Parsing file '%s'...", filepath)
 
 	for s.Scan() {
-		if ErrorLevel.LogErrorCtx(true, fmt.Sprintf("reading file '%s'", filepath), s.Err()) {
+		if ErrorLevel.LogErrorCtx(NilLevel, fmt.Sprintf("reading file '%s'", filepath), s.Err()) {
 			continue
 		}
 
 		p := strings.SplitN(s.Text(), " ", 2)
 
 		if len(p) != 2 {
-			ErrorLevel.LogErrorCtx(true, fmt.Sprintf("reading file '%s'", filepath), errors.New("line not well formatted !"))
+			ErrorLevel.LogErrorCtx(NilLevel, fmt.Sprintf("reading file '%s'", filepath), errors.New("line not well formatted !"))
 			continue
 		}
 
@@ -174,6 +174,7 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 		switch strings.ToLower(p[0]) {
 		case "job":
 			if j.JobId != "" {
+				InfoLevel.Logf("Saving Job Id '%s' from file %s...", j.JobId, filepath)
 				j.SaveJob()
 			}
 
@@ -181,11 +182,11 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 			j = NewJobItem(p[1])
 			err = j.Load()
-			WarnLevel.LogErrorCtx(true, fmt.Sprintf("loading data for job '%s'", j.JobId), err)
+			WarnLevel.LogErrorCtx(DebugLevel, fmt.Sprintf("loading data for job '%s'", j.JobId), err)
 
 		case "action":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'action' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'action' for job '%s'", j.JobId), err)
 				j.Disp = 0
 			} else {
 				j.Disp = int(val)
@@ -193,7 +194,7 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "adkim":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'adkim' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'adkim' for job '%s'", j.JobId), err)
 				j.Request.ADKIM = 0
 			} else {
 				j.Request.ADKIM = int(val)
@@ -201,7 +202,7 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "align_dkim":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'align_dkim' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'align_dkim' for job '%s'", j.JobId), err)
 				j.AlignDKIM = 0
 			} else {
 				j.AlignDKIM = int(val)
@@ -209,7 +210,7 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "align_spf":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'align_spf' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'align_spf' for job '%s'", j.JobId), err)
 				j.AlignSPF = 0
 			} else {
 				j.AlignSPF = int(val)
@@ -217,7 +218,7 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "aspf":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'aspf' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'aspf' for job '%s'", j.JobId), err)
 				j.Request.ASPF = 0
 			} else {
 				j.Request.ASPF = int(val)
@@ -228,10 +229,10 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 			d := strings.SplitN(p[1], " ", 2)
 			sig.Domain = database.NewDomain(d[0])
 			err = sig.Domain.Load()
-			WarnLevel.LogErrorCtx(true, fmt.Sprintf("loading value 'dkim domain' for job '%s'", j.JobId), err)
+			WarnLevel.LogErrorCtx(DebugLevel, fmt.Sprintf("loading value 'dkim domain' for job '%s'", j.JobId), err)
 
 			if val, err = strconv.ParseInt(d[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'dkim result' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'dkim result' for job '%s'", j.JobId), err)
 				sig.Pass = 5
 			} else {
 				sig.Pass = int(val)
@@ -249,19 +250,19 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "from":
 			err = j.SetFromDomain(p[1])
-			WarnLevel.LogErrorCtx(true, fmt.Sprintf("loading domain from '%s' for job '%s'", p[1], j.JobId), err)
+			WarnLevel.LogErrorCtx(DebugLevel, fmt.Sprintf("loading domain from '%s' for job '%s'", p[1], j.JobId), err)
 
 		case "ipaddr":
 			err = j.SetIpAddr(p[1])
-			WarnLevel.LogErrorCtx(true, fmt.Sprintf("loading ipaddr '%s' for job '%s'", p[1], j.JobId), err)
+			WarnLevel.LogErrorCtx(DebugLevel, fmt.Sprintf("loading ipaddr '%s' for job '%s'", p[1], j.JobId), err)
 
 		case "mfrom":
 			err = j.SetEnvDomain(p[1])
-			WarnLevel.LogErrorCtx(true, fmt.Sprintf("loading domain env '%s' for job '%s'", p[1], j.JobId), err)
+			WarnLevel.LogErrorCtx(DebugLevel, fmt.Sprintf("loading domain env '%s' for job '%s'", p[1], j.JobId), err)
 
 		case "p":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'p' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'p' for job '%s'", j.JobId), err)
 				j.Request.Policy = 0
 			} else {
 				j.Request.Policy = int(val)
@@ -269,7 +270,7 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "pct":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'pct' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'pct' for job '%s'", j.JobId), err)
 				j.Request.Pct = 0
 			} else {
 				j.Request.Pct = int(val)
@@ -277,11 +278,11 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "pdomain":
 			err = j.SetPolicyDomain(p[1])
-			WarnLevel.LogErrorCtx(true, fmt.Sprintf("loading domain policy '%s' for job '%s'", p[1], j.JobId), err)
+			WarnLevel.LogErrorCtx(DebugLevel, fmt.Sprintf("loading domain policy '%s' for job '%s'", p[1], j.JobId), err)
 
 		case "policy":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'policy' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'policy' for job '%s'", j.JobId), err)
 				j.Policy = 0
 			} else {
 				j.Policy = int(val)
@@ -289,10 +290,10 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "received":
 			err = j.SetDate(p[1])
-			WarnLevel.LogErrorCtx(true, fmt.Sprintf("setting Date '%s' for job '%s'", p[1], j.JobId), err)
+			WarnLevel.LogErrorCtx(DebugLevel, fmt.Sprintf("setting Date '%s' for job '%s'", p[1], j.JobId), err)
 
 			err = j.Request.SetDate(p[1])
-			WarnLevel.LogErrorCtx(true, fmt.Sprintf("setting Request Date '%s' for job '%s'", p[1], j.JobId), err)
+			WarnLevel.LogErrorCtx(DebugLevel, fmt.Sprintf("setting Request Date '%s' for job '%s'", p[1], j.JobId), err)
 
 		case "reporter":
 			err = j.SetReporter(p[1])
@@ -304,7 +305,7 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "sp":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'policy' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'policy' for job '%s'", j.JobId), err)
 				j.Request.Spolicy = 0
 			} else {
 				j.Request.Spolicy = int(val)
@@ -312,18 +313,19 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 		case "spf":
 			if val, err = strconv.ParseInt(p[1], 10, 64); err != nil {
-				WarnLevel.LogErrorCtx(true, fmt.Sprintf("converting value 'policy' for job '%s'", j.JobId), err)
+				WarnLevel.LogErrorCtx(NilLevel, fmt.Sprintf("converting value 'policy' for job '%s'", j.JobId), err)
 				j.SPF = 0
 			} else {
 				j.SPF = int(val)
 			}
 
 		default:
-			ErrorLevel.LogErrorCtx(true, fmt.Sprintf("reading file '%s'", filepath), fmt.Errorf("key '%s' not understand", p[0]))
+			ErrorLevel.LogErrorCtx(NilLevel, fmt.Sprintf("reading file '%s'", filepath), fmt.Errorf("key '%s' not understand", p[0]))
 		}
 	}
 
 	if j.JobId != "" {
+		InfoLevel.Logf("Saving Job Id '%s' from file %s...", j.JobId, filepath)
 		j.SaveJob()
 	}
 
@@ -332,7 +334,7 @@ func parseFile(wg *sync.WaitGroup, nbr, sub int, filepath string) {
 
 func (job jobItem) String() string {
 	str, err := yaml.Marshal(job)
-	ErrorLevel.LogErrorCtx(true, "yaml encoding job", err)
+	ErrorLevel.LogErrorCtx(NilLevel, "yaml encoding job", err)
 
 	return fmt.Sprintf("---\n%s\n", string(str))
 
@@ -340,11 +342,11 @@ func (job jobItem) String() string {
 
 func (job *jobItem) SaveJob() {
 	if job == nil {
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("saving job '%s'", job), errors.New("invalid job reference - segment fault"))
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("saving job '%s'", job), errors.New("invalid job reference - segment fault"))
 	}
 
 	if err := job.Save(); err != nil {
-		FatalLevel.LogErrorCtx(true, fmt.Sprintf("saving job '%s'", job), err)
+		FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("saving job '%s'", job), err)
 		return
 	}
 
@@ -357,12 +359,12 @@ func (job *jobItem) SaveJob() {
 		job.signature[k].Message = &job.Messages
 
 		if err := job.signature[k].Save(); err != nil {
-			FatalLevel.LogErrorCtx(true, fmt.Sprintf("saving sign's job '%s'", job), err)
+			FatalLevel.LogErrorCtx(NilLevel, fmt.Sprintf("saving sign's job '%s'", job), err)
 			return
 		}
 
 		ids = append(ids, job.signature[k].Id)
 	}
 
-	DebugLevel.Logf("Job Id '%s' saved (Msg %d, Req %d, Sig %v", job.JobId, job.Id, job.Request.Id, ids)
+	InfoLevel.Logf("Job Id '%s' saved (Msg %d, Req %d, Sig %v", job.JobId, job.Id, job.Request.Id, ids)
 }
