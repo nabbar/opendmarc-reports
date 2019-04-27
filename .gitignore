@@ -1,6 +1,10 @@
 .idea
-*.lock
-*.pm
-opendmarc-reports
+.idea/
+.idea/*
+.idea/**/*
+
+Gopkg.lock
 vendor
-*test*
+.vendor*
+
+BUILD_*

@@ -1,0 +1,31 @@
+language: go
+go:
+  - "1.x"
+
+dist: xenial
+
+before_install:
+  - git clone https://github.com/nabbar/gotools.git scripts
+  - ./scripts/prepare
+
+script:
+  - ./makeCertif
+  - ./scripts/ci_depend
+#  - ./scripts/ci_static
+#  - ./scripts/ci_packr
+  - ./scripts/ci_format
+  - ./scripts/ci_travis_makeVersion
+  - ./scripts/ci_linter
+  - ./scripts/ci_secu
+
+  # Test Linux Build
+  # a self running binary based on linux C lib (available as FROM scratch in docker file with the CGO_ENABLED=0 and the installsuffix cgo)
+  - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -v -installsuffix cgo -ldflags "-w -s -extldflags '-static' $(cat BUILD_PARAMS)" -o $(cat BUILD_PACKAGE)_linux_amd64_self
+  # a linux running binary (need an os to run it)
+  - CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -v -ldflags "-w -s -extldflags '-static' $(cat BUILD_PARAMS)" -o $(cat BUILD_PACKAGE)_linux_amd64
+
+  # Test Windows Build
+  # a self running binary based on windows C lib (available as FROM scratch in docker file with the CGO_ENABLED=0 and the installsuffix cgo)
+  - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -a -v -installsuffix cgo -ldflags "-w -s -extldflags '-static' $(cat BUILD_PARAMS)" -o $(cat BUILD_PACKAGE)_win64_self.exe
+  # a windows running binary (need an os to run it)
+  - CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -a -v -ldflags "-w -s -extldflags '-static' $(cat BUILD_PARAMS)" -o $(cat BUILD_PACKAGE)_win64.exe
